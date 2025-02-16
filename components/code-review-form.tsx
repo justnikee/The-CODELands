@@ -6,7 +6,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 
-
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 type FormData = {
@@ -15,27 +14,33 @@ type FormData = {
 }
 
 export default function CodeReviewForm() {
-  const { register, handleSubmit, formState: { errors }, setValue } = useForm<FormData>()
+  const { register, handleSubmit, formState: { errors }, setValue, trigger } = useForm<FormData>({
+    defaultValues: { code: '', language: '' }
+  })
+  const queryClient = useQueryClient()
 
-        const queryClient = useQueryClient();
-
-        const mutation = useMutation({
-          mutationFn: async (codeData: FormData): Promise<any> =>  {
-            const res = await fetch('/api/review', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(codeData),
-            })
-            return res.json()
-          },
-          onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ['reviews']});
-          },
-        })
+  const mutation = useMutation({
+    mutationFn: async (codeData: FormData): Promise<any> => {
+      const res = await fetch('/api/code-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(codeData),
+      })
+      if (!res.ok) {
+        throw new Error('Failed to submit code')
+      }
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: ['reviews']})
+    },
+    onError: (error) => {
+      console.error('Mutation failed:', error)
+    },
+  })
 
   const onSubmit = (data: FormData) => {
     mutation.mutate(data)
-    console.log(data)
   }
 
   return (
@@ -50,8 +55,12 @@ export default function CodeReviewForm() {
             {...register('code', { required: 'Code is required' })}
           />
           {errors.code && <p className="text-red-500">{errors.code.message}</p>}
-          <Select {...register('language', { required: 'Language is required' })}
-          onValueChange={(value) => setValue('language', value)}
+
+          <Select
+            onValueChange={(value) => {
+              setValue('language', value, { shouldValidate: true }) 
+              trigger('language')
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a language" />
@@ -64,6 +73,7 @@ export default function CodeReviewForm() {
           </Select>
           {errors.language && <p className="text-red-500">{errors.language.message}</p>}
         </CardContent>
+
         <CardFooter>
           <Button type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? 'Submitting...' : 'Submit for Review'}
