@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+
+
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 type FormData = {
   code: string
@@ -13,14 +15,27 @@ type FormData = {
 }
 
 export default function CodeReviewForm() {
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>()
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { register, handleSubmit, formState: { errors }, setValue } = useForm<FormData>()
 
-  const onSubmit = async (data: FormData) => {
-    setIsSubmitting(true)
-    // TODO: Implement API call to submit code for review
+        const queryClient = useQueryClient();
+
+        const mutation = useMutation({
+          mutationFn: async (codeData: FormData): Promise<any> =>  {
+            const res = await fetch('/api/review', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(codeData),
+            })
+            return res.json()
+          },
+          onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['reviews']});
+          },
+        })
+
+  const onSubmit = (data: FormData) => {
+    mutation.mutate(data)
     console.log(data)
-    setIsSubmitting(false)
   }
 
   return (
@@ -35,7 +50,9 @@ export default function CodeReviewForm() {
             {...register('code', { required: 'Code is required' })}
           />
           {errors.code && <p className="text-red-500">{errors.code.message}</p>}
-          <Select {...register('language', { required: 'Language is required' })}>
+          <Select {...register('language', { required: 'Language is required' })}
+          onValueChange={(value) => setValue('language', value)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select a language" />
             </SelectTrigger>
@@ -48,8 +65,8 @@ export default function CodeReviewForm() {
           {errors.language && <p className="text-red-500">{errors.language.message}</p>}
         </CardContent>
         <CardFooter>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Submitting...' : 'Submit for Review'}
+          <Button type="submit" disabled={mutation.isPending}>
+            {mutation.isPending ? 'Submitting...' : 'Submit for Review'}
           </Button>
         </CardFooter>
       </form>
