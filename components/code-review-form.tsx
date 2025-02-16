@@ -40,8 +40,12 @@ export default function CodeReviewForm() {
   })
 
   const onSubmit = (data: FormData) => {
-    mutation.mutate(data)
-  }
+    mutation.mutate({
+      code: data.code,
+      language: data.language,
+    });
+  };
+  
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
